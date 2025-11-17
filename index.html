@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Blog Nayri - Postingan Pasti Muncul!</title>
+  <title>Blog Nayri - Full Fix!</title>
   
   <style>
     :root {
@@ -68,7 +68,7 @@
     .loading { color: #777; font-style: italic; text-align: center; }
 
     .dashboard-header {
-      display: flex; justify-content:space-between; align-items:center;
+      display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 20px; flex-wrap: wrap; gap: 10px;
     }
 
@@ -148,17 +148,17 @@
     </div>
   </div>
 
-  <!-- === JAVASCRIPT - SUDAH DIISI DATA KAMU! === -->
+  <!-- === JAVASCRIPT - FULL FIX DENGAN DATA KAMU & ENV TOKEN! === -->
   <script>
-    // === DATA KAMU SUDAH DIISI! ===
+    // === DATA KAMU ===
     const GITHUB_CONFIG = {
       owner: 'andrivabahb',
       repo: 'nayri_blog',
-      token: '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',
+      token: process.env.GITHUB_TOKEN || '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',  // Pakai env dari Netlify!
       filePath: 'posts.json'
     };
 
-    const NETLIFY_WEBHOOK = 'https://api.netlify.com/build_hooks/691ad3ef114926e83c69202f';
+    const NETLIFY_WEBHOOK = 'https://api.netlify.com/build_hooks/691ad3ef114926926e83c69202f';
 
     let posts = [];
     let currentMedia = null;
@@ -193,6 +193,8 @@
         } else if (res.ok) {
           const data = await res.json();
           posts = JSON.parse(atob(data.content)) || [];
+        } else {
+          throw new Error('Gagal fetch');
         }
         renderPosts();
         if (!document.getElementById('admin-page').classList.contains('hidden')) renderAdminPosts();
@@ -202,17 +204,21 @@
     }
 
     async function createEmptyFile() {
-      await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `token ${GITHUB_CONFIG.token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          message: 'Create posts.json',
-          content: btoa('[]')
-        })
-      });
+      try {
+        await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `token ${GITHUB_CONFIG.token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message: 'Create posts.json',
+            content: bto a('[]')
+          })
+        });
+      } catch (err) {
+        console.error('Gagal buat file:', err);
+      }
     }
 
     async function savePostsToGitHub() {
@@ -224,7 +230,7 @@
           const data = await res.json();
           sha = data.sha;
         }
-        await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
+        const response = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
           method: 'PUT',
           headers: {
             'Authorization': `token ${GITHUB_CONFIG.token}`,
@@ -236,8 +242,13 @@
             sha: sha || undefined
           })
         });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Gagal update');
+        }
       } catch (err) {
-        console.error('Gagal simpan:', err);
+        console.error('Gagal simpan ke GitHub:', err);
+        alert('Gagal simpan postingan! Cek console untuk detail error.');
         throw err;
       }
     }
@@ -246,7 +257,7 @@
       try {
         await fetch(NETLIFY_WEBHOOK, { method: 'POST' });
       } catch (err) {
-        console.warn('Webhook gagal');
+        console.warn('Webhook gagal:', err);
       }
     }
 
@@ -282,7 +293,7 @@
         renderPosts();
         alert('Postingan tersimpan! Tunggu 30-60 detik, lalu REFRESH halaman.');
       } catch (err) {
-        alert('Gagal simpan! Cek koneksi atau token.');
+        alert('Gagal simpan! Cek console browser (F12) untuk error.');
       }
     }
 
@@ -402,4 +413,4 @@
     showBlog();
   </script>
 </body>
-</html>
+  </html>
