@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Blog Bersama - Admin Bisa Login!</title>
+  <title>Blog Nayri - Postingan Pasti Muncul!</title>
   
   <style>
     :root {
@@ -68,7 +68,7 @@
     .loading { color: #777; font-style: italic; text-align: center; }
 
     .dashboard-header {
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex; justify-content:space-between; align-items:center;
       margin-bottom: 20px; flex-wrap: wrap; gap: 10px;
     }
 
@@ -83,8 +83,8 @@
   <!-- === BLOG PUBLIK === -->
   <div id="blog-page" class="container">
     <header>
-      <h1 id="blog-title">Blog Bersama</h1>
-      <p id="blog-subtitle">Semua orang bisa lihat postinganmu!</p>
+      <h1>Nayri Blog</h1>
+      <p>Semua orang bisa lihat postinganmu!</p>
     </header>
 
     <div id="posts-container">
@@ -122,26 +122,21 @@
       </div>
     </div>
 
-    <!-- Form -->
     <div id="post-form" class="card hidden">
       <h3 id="form-title">Tambah Postingan</h3>
       <input type="hidden" id="edit-id" />
-
-      <input type="text" id="post-title" placeholder="Judul" required />
+      <input type="text" id="post-title" placeholder="Judul" />
       <textarea id="post-content" rows="5" placeholder="Isi..."></textarea>
       <input type="text" id="post-author" placeholder="Penulis" />
-
-      <div style="margin: 15px 0;">
+      <div style="margin:15px 0;">
         <label><strong>Gambar/Video (maks 1.5MB)</strong></label>
         <input type="file" id="media-upload" accept="image/*,video/*" />
       </div>
-
       <div id="media-preview" class="media-preview hidden">
         <p><strong>Pratinjau:</strong></p>
         <div id="preview-content"></div>
         <button class="remove-media" onclick="removeMedia()">Hapus</button>
       </div>
-
       <div style="text-align:right; margin-top:15px;">
         <button class="btn btn-primary" onclick="savePost()">Simpan</button>
         <button class="btn" onclick="hideForm()">Batal</button>
@@ -153,48 +148,29 @@
     </div>
   </div>
 
-  <!-- === JAVASCRIPT - SUDAH DIPERBAIKI TOTAL === -->
+  <!-- === JAVASCRIPT - SUDAH DIISI DATA KAMU! === -->
   <script>
-    // === UBAH INI SESUAI GITHUB + NETLIFY KAMU ===
+    // === DATA KAMU SUDAH DIISI! ===
     const GITHUB_CONFIG = {
-      owner: 'andrivabahb',        // Contoh: 'johndoe'
-      repo: 'nayri_blog',                // Nama repo
-      token: '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',     // Paste Personal Access Token di sini
+      owner: 'andrivabahb',
+      repo: 'nayri_blog',
+      token: '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',
       filePath: 'posts.json'
     };
 
-    const NETLIFY_WEBHOOK = 'https://api.netlify.com/build_hooks/691ad3ef114926e83c69202f'; // Dari Build Hooks
+    const NETLIFY_WEBHOOK = 'https://api.netlify.com/build_hooks/691ad3ef114926e83c69202f';
 
     let posts = [];
     let currentMedia = null;
     let currentMediaType = null;
 
-    // === NAVIGASI (SUDAH DIPERBAIKI!) ===
-    function showBlog() { 
-      hideAll(); 
-      document.getElementById('blog-page').classList.remove('hidden'); 
-      fetchPosts(); 
-    }
-    
-    function showAdmin() { 
-      hideAll(); 
-      document.getElementById('login-page').classList.remove('hidden'); 
-    }
-    
-    function showDashboard() { 
-      hideAll(); 
-      document.getElementById('admin-page').classList.remove('hidden'); 
-      fetchPosts(); 
-    }
-    
-    function hideAll() {
-      ['blog-page', 'login-page', 'admin-page'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add('hidden');
-      });
-    }
+    // === NAVIGASI ===
+    function showBlog() { hideAll(); document.getElementById('blog-page').classList.remove('hidden'); fetchPosts(); }
+    function showAdmin() { hideAll(); document.getElementById('login-page').classList.remove('hidden'); }
+    function showDashboard() { hideAll(); document.getElementById('admin-page').classList.remove('hidden'); fetchPosts(); }
+    function hideAll() { ['blog-page', 'login-page', 'admin-page'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); }); }
 
-    // === LOGIN (SUDAH DIPERBAIKI!) ===
+    // === LOGIN ===
     function login() {
       const user = document.getElementById('username').value.trim();
       const pass = document.getElementById('password').value;
@@ -205,44 +181,49 @@
         document.getElementById('login-error').textContent = 'Username atau password salah!';
       }
     }
-
-    function logout() { 
-      document.getElementById('username').value = 'admin';
-      document.getElementById('password').value = '1234';
-      showBlog(); 
-    }
+    function logout() { showBlog(); }
 
     // === GITHUB API ===
     async function fetchPosts() {
       try {
         const res = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`);
-        if (!res.ok) {
-          if (res.status === 404) {
-            posts = [];
-            savePostsToGitHub(); // Buat file jika belum ada
-          } else {
-            throw new Error('Gagal fetch');
-          }
-        } else {
+        if (res.status === 404) {
+          posts = [];
+          await createEmptyFile();
+        } else if (res.ok) {
           const data = await res.json();
           posts = JSON.parse(atob(data.content)) || [];
         }
         renderPosts();
-        if (!document.getElementById('admin-page').classList.contains('hidden')) {
-          renderAdminPosts();
-        }
+        if (!document.getElementById('admin-page').classList.contains('hidden')) renderAdminPosts();
       } catch (err) {
         document.getElementById('posts-container').innerHTML = '<p style="color:red;">Gagal memuat. Cek repo & token.</p>';
       }
+    }
+
+    async function createEmptyFile() {
+      await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${GITHUB_CONFIG.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: 'Create posts.json',
+          content: btoa('[]')
+        })
+      });
     }
 
     async function savePostsToGitHub() {
       const content = btoa(JSON.stringify(posts, null, 2));
       try {
         const res = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, { method: 'GET' });
-        const data = await res.json();
-        const sha = data.sha;
-
+        let sha = null;
+        if (res.ok) {
+          const data = await res.json();
+          sha = data.sha;
+        }
         await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
           method: 'PUT',
           headers: {
@@ -252,27 +233,16 @@
           body: JSON.stringify({
             message: 'Update posts',
             content: content,
-            sha: sha
+            sha: sha || undefined
           })
         });
       } catch (err) {
-        // Jika file belum ada, buat baru
-        await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `token ${GITHUB_CONFIG.token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: 'Create posts.json',
-            content: content
-          })
-        });
+        console.error('Gagal simpan:', err);
+        throw err;
       }
     }
 
     async function triggerNetlifyRebuild() {
-      if (NETLIFY_WEBHOOK.includes('GANTI_DENGAN_ID_WEBHOOK')) return;
       try {
         await fetch(NETLIFY_WEBHOOK, { method: 'POST' });
       } catch (err) {
@@ -310,9 +280,9 @@
         hideForm();
         renderAdminPosts();
         renderPosts();
-        alert('Postingan tersimpan! Tunggu 30-60 detik, lalu refresh halaman.');
+        alert('Postingan tersimpan! Tunggu 30-60 detik, lalu REFRESH halaman.');
       } catch (err) {
-        alert('Gagal simpan! Cek token GitHub & webhook Netlify.');
+        alert('Gagal simpan! Cek koneksi atau token.');
       }
     }
 
@@ -346,10 +316,7 @@
     function renderAdminPosts() {
       const container = document.getElementById('admin-posts');
       container.innerHTML = '';
-      if (!posts.length) {
-        container.innerHTML = '<p>Tidak ada postingan.</p>';
-        return;
-      }
+      if (!posts.length) { container.innerHTML = '<p>Tidak ada postingan.</p>'; return; }
       posts.forEach(post => {
         const div = document.createElement('div');
         div.className = 'card';
@@ -369,12 +336,7 @@
     }
 
     // === FORM & MEDIA ===
-    function showAddForm() {
-      resetForm();
-      document.getElementById('form-title').textContent = 'Tambah Postingan Baru';
-      document.getElementById('post-form').classList.remove('hidden');
-    }
-
+    function showAddForm() { resetForm(); document.getElementById('form-title').textContent = 'Tambah Postingan'; document.getElementById('post-form').classList.remove('hidden'); }
     function editPost(id) {
       const post = posts.find(p => p.id === id);
       if (!post) return;
@@ -384,19 +346,10 @@
       document.getElementById('post-title').value = post.title;
       document.getElementById('post-content').value = post.content;
       document.getElementById('post-author').value = post.author || '';
-      if (post.media) {
-        currentMedia = post.media;
-        currentMediaType = post.mediaType;
-        showMediaPreview();
-      }
+      if (post.media) { currentMedia = post.media; currentMediaType = post.mediaType; showMediaPreview(); }
       document.getElementById('post-form').classList.remove('hidden');
     }
-
-    function hideForm() {
-      document.getElementById('post-form').classList.add('hidden');
-      resetForm();
-    }
-
+    function hideForm() { document.getElementById('post-form').classList.add('hidden'); resetForm(); }
     function resetForm() {
       document.getElementById('edit-id').value = '';
       document.getElementById('post-title').value = '';
@@ -410,17 +363,9 @@
     document.getElementById('media-upload').addEventListener('change', e => {
       const file = e.target.files[0];
       if (!file) return;
-      if (file.size > 1.5 * 1024 * 1024) {
-        alert('Maksimal 1.5MB!');
-        e.target.value = '';
-        return;
-      }
+      if (file.size > 1.5 * 1024 * 1024) { alert('Maksimal 1.5MB!'); e.target.value = ''; return; }
       const reader = new FileReader();
-      reader.onload = ev => {
-        currentMedia = ev.target.result;
-        currentMediaType = file.type;
-        showMediaPreview();
-      };
+      reader.onload = ev => { currentMedia = ev.target.result; currentMediaType = file.type; showMediaPreview(); };
       reader.readAsDataURL(file);
     });
 
@@ -439,7 +384,7 @@
     }
 
     async function deletePost(id) {
-      if (!confirm('Hapus postingan ini?')) return;
+      if (!confirm('Hapus?')) return;
       posts = posts.filter(p => p.id !== id);
       await savePostsToGitHub();
       await triggerNetlifyRebuild();
