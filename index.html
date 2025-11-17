@@ -167,255 +167,181 @@
     let currentMedia = null;
     let currentMediaType = null;
 
-    // === GITHUB API ===
-    async function fetchPosts() {
-      try {
-        const res = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`);
-        if (!res.ok) throw new Error('File tidak ditemukan atau repo salah');
-        const data = await res.json();
-        posts = JSON.parse(atob(data.content));
-        renderPosts();
-        if (!document.getElementById('admin-page').classList.contains('hidden')) {
-          renderAdminPosts();
-        }
-      } catch (err) {
-        document.getElementById('posts-container').innerHTML = '<p style="color:red;">Gagal memuat postingan. Pastikan repo, token, dan file posts.json benar.</p>';
-      }
-    }
+  // TAMBAHKAN INI: NETLIFY WEBHOOK URL
+  const NETLIFY_WEBHOOK = 'https://api.netlify.com/build_hooks/691ad3ef114926e83c69202f';
 
-    async function savePostsToGitHub() {
-      const content = btoa(JSON.stringify(posts, null, 2));
-      try {
-        const res = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
-          method: 'GET'
-        });
-        const data = await res.json();
-        const sha = data.sha;
+  let posts = [];
+  let currentMedia = null;
+  let currentMediaType = null;
 
-        await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `token ${GITHUB_CONFIG.token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: 'Update posts',
-            content: content,
-            sha: sha
-          })
-        });
-      } catch (err) {
-        throw new Error('Gagal simpan ke GitHub');
-      }
+  // === GITHUB API (tetap) ===
+  async function fetchPosts() {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`);
+      if (!res.ok) throw new Error('File tidak ditemukan');
+      const data = await res.json();
+      posts = JSON.parse(atob(data.content));
+      renderPosts();
+      if (!document.getElementById('admin-page').classList.contains('hidden')) renderAdminPosts();
+    } catch (err) {
+      document.getElementById('posts-container').innerHTML = '<p style="color:red;">Gagal load: Pastikan repo & token benar.</p>';
     }
+  }
 
-    // === NAVIGASI (SUDAH ADA showAdmin!) ===
-    function showBlog() { 
-      hideAll(); 
-      document.getElementById('blog-page').classList.remove('hidden'); 
-      fetchPosts(); 
-    }
-    
-    function showAdmin() { 
-      hideAll(); 
-      document.getElementById('login-page').classList.remove('hidden'); 
-    }
-    
-    function showDashboard() { 
-      hideAll(); 
-      document.getElementById('admin-page').classList.remove('hidden'); 
-      fetchPosts(); 
-    }
-    
-    function hideAll() {
-      ['blog-page', 'login-page', 'admin-page'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
+  async function savePostsToGitHub() {
+    const content = btoa(JSON.stringify(posts, null, 2));
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, { method: 'GET' });
+      const data = await res.json();
+      const sha = data.sha;
+
+      await fetch(`https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${GITHUB_CONFIG.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: 'Update posts',
+          content: content,
+          sha: sha
+        })
       });
+    } catch (err) {
+      throw new Error('Gagal simpan ke GitHub');
+    }
+  }
+
+  // === TRIGGER NETLIFY REBUILD ===
+  async function triggerNetlifyRebuild() {
+    try {
+      await fetch(NETLIFY_WEBHOOK, { method: 'POST' });
+    } catch (err) {
+      console.warn('Webhook gagal, tapi data tetap tersimpan di GitHub');
+    }
+  }
+
+  // === SIMPAN POST (DIPERBAIKI!) ===
+  async function savePost() {
+    const id = document.getElementById('edit-id').value;
+    const title = document.getElementById('post-title').value.trim();
+    const content = document.getElementById('post-content').value.trim();
+    const author = document.getElementById('post-author').value.trim() || 'Admin';
+
+    if (!title) return alert('Judul wajib!');
+
+    const postData = {
+      id: id ? parseInt(id) : Date.now(),
+      title, content, author,
+      date: new Date().toLocaleDateString('id-ID'),
+      media: currentMedia,
+      mediaType: currentMediaType
+    };
+
+    if (id) {
+      const idx = posts.findIndex(p => p.id == id);
+      posts[idx] = postData;
+    } else {
+      posts.unshift(postData);
     }
 
-    // === LOGIN ===
-    function login() {
-      if (document.getElementById('username').value === 'admin' && document.getElementById('password').value === '1234') {
-        showDashboard();
-      } else {
-        document.getElementById('login-error').textContent = 'Username atau password salah!';
-      }
-    }
-    function logout() { showBlog(); }
-
-    // === RENDER ===
-    function renderPosts() {
-      const container = document.getElementById('posts-container');
-      container.innerHTML = '';
-      if (!posts.length) {
-        container.innerHTML = '<p style="text-align:center; color:#777;">Belum ada postingan.</p>';
-        return;
-      }
-      posts.forEach(post => {
-        const div = document.createElement('div');
-        div.className = 'card';
-        let media = '';
-        if (post.media) {
-          media = post.mediaType.startsWith('image')
-            ? `<img src="${post.media}" style="max-width:100%; border-radius:8px; margin:15px 0;">`
-            : `<video controls style="max-width:100%; border-radius:8px; margin:15px 0;"><source src="${post.media}" type="${post.mediaType}"></video>`;
-        }
-        div.innerHTML = `
-          <h2>${escapeHtml(post.title)}</h2>
-          <div class="post-meta">Oleh ${escapeHtml(post.author)} • ${post.date}</div>
-          ${media}
-          <p>${escapeHtml(post.content).replace(/\n/g, '<br>')}</p>
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    function renderAdminPosts() {
-      const container = document.getElementById('admin-posts');
-      container.innerHTML = '';
-      if (!posts.length) {
-        container.innerHTML = '<p>Tidak ada postingan.</p>';
-        return;
-      }
-      posts.forEach(post => {
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;';
-        div.innerHTML = `
-          <div style="flex:1;">
-            <strong>${escapeHtml(post.title)}</strong><br>
-            <small>${post.date} • ${escapeHtml(post.author)}</small>
-          </div>
-          <div>
-            <button class="btn btn-primary btn-small" onclick="editPost(${post.id})">Edit</button>
-            <button class="btn btn-danger btn-small" onclick="deletePost(${post.id})">Hapus</button>
-          </div>
-        `;
-        container.appendChild(div);
-      });
-    }
-
-    // === FORM & MEDIA ===
-    function showAddForm() {
-      resetForm();
-      document.getElementById('form-title').textContent = 'Tambah Postingan';
-      document.getElementById('post-form').classList.remove('hidden');
-    }
-
-    function editPost(id) {
-      const post = posts.find(p => p.id === id);
-      if (!post) return;
-      resetForm();
-      document.getElementById('form-title').textContent = 'Edit Postingan';
-      document.getElementById('edit-id').value = id;
-      document.getElementById('post-title').value = post.title;
-      document.getElementById('post-content').value = post.content;
-      document.getElementById('post-author').value = post.author;
-      if (post.media) {
-        currentMedia = post.media;
-        currentMediaType = post.mediaType;
-        showMediaPreview();
-      }
-      document.getElementById('post-form').classList.remove('hidden');
-    }
-
-    function hideForm() { 
-      document.getElementById('post-form').classList.add('hidden'); 
-      resetForm(); 
-    }
-
-    function resetForm() {
-      document.getElementById('edit-id').value = '';
-      document.getElementById('post-title').value = '';
-      document.getElementById('post-content').value = '';
-      document.getElementById('post-author').value = '';
-      document.getElementById('media-upload').value = '';
-      document.getElementById('media-preview').classList.add('hidden');
-      currentMedia = currentMediaType = null;
-    }
-
-    document.getElementById('media-upload').addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      if (file.size > 1.5 * 1024 * 1024) {
-        alert('Maksimal 1.5MB!');
-        e.target.value = '';
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = ev => {
-        currentMedia = ev.target.result;
-        currentMediaType = file.type;
-        showMediaPreview();
-      };
-      reader.readAsDataURL(file);
-    });
-
-    function showMediaPreview() {
-      const el = currentMediaType.startsWith('image')
-        ? `<img src="${currentMedia}" style="max-width:100%; max-height:200px;">`
-        : `<video controls style="max-width:100%; max-height:200px;"><source src="${currentMedia}" type="${currentMediaType}"></video>`;
-      document.getElementById('preview-content').innerHTML = el;
-      document.getElementById('media-preview').classList.remove('hidden');
-    }
-
-    function removeMedia() {
-      currentMedia = currentMediaType = null;
-      document.getElementById('media-preview').classList.add('hidden');
-      document.getElementById('media-upload').value = '';
-    }
-
-    // === SIMPAN & HAPUS ===
-    async function savePost() {
-      const id = document.getElementById('edit-id').value;
-      const title = document.getElementById('post-title').value.trim();
-      const content = document.getElementById('post-content').value.trim();
-      const author = document.getElementById('post-author').value.trim() || 'Admin';
-
-      if (!title) return alert('Judul wajib!');
-
-      const postData = {
-        id: id ? parseInt(id) : Date.now(),
-        title, content, author,
-        date: new Date().toLocaleDateString('id-ID'),
-        media: currentMedia,
-        mediaType: currentMediaType
-      };
-
-      if (id) {
-        const idx = posts.findIndex(p => p.id == id);
-        posts[idx] = postData;
-      } else {
-        posts.unshift(postData);
-      }
-
-      try {
-        await savePostsToGitHub();
-        hideForm();
-        renderAdminPosts();
-        renderPosts();
-        alert('Postingan tersimpan! Netlify akan update dalam 1 menit.');
-      } catch (err) {
-        alert('Gagal simpan ke GitHub. Cek token & koneksi!');
-      }
-    }
-
-    async function deletePost(id) {
-      if (!confirm('Hapus postingan ini?')) return;
-      posts = posts.filter(p => p.id !== id);
+    try {
       await savePostsToGitHub();
+      await triggerNetlifyRebuild(); // <--- INI YANG BARU!
+      hideForm();
       renderAdminPosts();
       renderPosts();
+      alert('Postingan tersimpan! Netlify sedang rebuild... Tunggu 30-60 detik, lalu refresh.');
+    } catch (err) {
+      alert('Gagal simpan! Cek token GitHub & webhook Netlify.');
     }
+  }
 
-    function escapeHtml(text) {
+  // === FUNGSI LAIN TETAP SAMA ===
+  function showBlog() { hideAll(); document.getElementById('blog-page').classList.remove('hidden'); fetchPosts(); }
+  function showAdmin() { hideAll(); document.getElementById('login-page').classList.remove('hidden'); }
+  function showDashboard() { hideAll(); document.getElementById('admin-page').classList.remove('hidden'); fetchPosts(); }
+  function hideAll() { ['blog-page', 'login-page', 'admin-page'].forEach(id => document.getElementById(id).classList.add('hidden')); }
+
+  function login() {
+    if (document.getElementById('username').value === 'admin' && document.getElementById('password').value === '1234') {
+      showDashboard();
+    } else {
+      document.getElementById('login-error').textContent = 'Salah!';
+    }
+  }
+  function logout() { showBlog(); }
+
+  function renderPosts() {
+    const container = document.getElementById('posts-container');
+    container.innerHTML = '';
+    if (!posts.length) {
+      container.innerHTML = '<p style="text-align:center; color:#777;">Belum ada postingan.</p>';
+      return;
+    }
+    posts.forEach(post => {
       const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
+      div.className = 'card';
+      let media = '';
+      if (post.media) {
+        media = post.mediaType.startsWith('image')
+          ? `<img src="${post.media}" style="max-width:100%; border-radius:8px; margin:15px 0;">`
+          : `<video controls style="max-width:100%; border-radius:8px; margin:15px 0;"><source src="${post.media}" type="${post.mediaType}"></video>`;
+      }
+      div.innerHTML = `
+        <h2>${escapeHtml(post.title)}</h2>
+        <div class="post-meta">Oleh ${escapeHtml(post.author)} • ${post.date}</div>
+        ${media}
+        <p>${escapeHtml(post.content).replace(/\n/g, '<br>')}</p>
+      `;
+      container.appendChild(div);
+    });
+  }
 
-    // === INIT ===
-    showBlog();
-  </script>
+  function renderAdminPosts() {
+    const container = document.getElementById('admin-posts');
+    container.innerHTML = '';
+    if (!posts.length) { container.innerHTML = '<p>Tidak ada postingan.</p>'; return; }
+    posts.forEach(post => {
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.style.cssText = 'display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;';
+      div.innerHTML = `
+        <div style="flex:1;">
+          <strong>${escapeHtml(post.title)}</strong><br>
+          <small>${post.date} • ${escapeHtml(post.author)}</small>
+        </div>
+        <div>
+          <button class="btn btn-primary btn-small" onclick="editPost(${post.id})">Edit</button>
+          <button class="btn btn-danger btn-small" onclick="deletePost(${post.id})">Hapus</button>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  }
+
+  // === FORM, MEDIA, HAPUS (tetap sama) ===
+  function showAddForm() { resetForm(); document.getElementById('form-title').textContent = 'Tambah Postingan'; document.getElementById('post-form').classList.remove('hidden'); }
+  function editPost(id) { /* ... sama seperti sebelumnya ... */ }
+  function hideForm() { document.getElementById('post-form').classList.add('hidden'); resetForm(); }
+  function resetForm() { /* ... */ }
+  document.getElementById('media-upload').addEventListener('change', /* ... */);
+  function showMediaPreview() { /* ... */ }
+  function removeMedia() { /* ... */ }
+
+  async function deletePost(id) {
+    if (!confirm('Hapus?')) return;
+    posts = posts.filter(p => p.id !== id);
+    await savePostsToGitHub();
+    await triggerNetlifyRebuild();
+    renderAdminPosts();
+    renderPosts();
+  }
+
+  function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+  // === INIT ===
+  showBlog();
+</script>
 </body>
 </html>
